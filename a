@@ -1,0 +1,14 @@
+	push 3
+	push 5
+	iadd
+a:
+	push 1
+	isub
+	dup
+	dup
+	iprint
+	push 0
+	bne a
+
+	push 35
+	iprint
