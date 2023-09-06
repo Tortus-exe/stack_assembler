@@ -103,17 +103,25 @@ def parse(x):
             out.append((r & 0xff0000) >> 16)
             out.append((r & 0xff000000) >> 24)
         elif(keyword in ["beq", "bgt", "ble", "bne", "bge", "blt", "jmp"]):
-            k+=2
+            k+=3
             out.append(branches[keyword])
             i+=1
             if(k - labels[x[i] + ":"] >= 0):
-                off = 0xffff - (k - labels[x[i] + ":"])
+                off = 0xffff - (k - labels[x[i] + ":"]) + 1
                 out.append(off & 0xff)
                 out.append((off & 0xff00) >> 8)
             else:
-                off = labels[x[i] + ":"] - k
+                off = labels[x[i] + ":"] - k + 1
                 out.append(off & 0xff)
                 out.append((off & 0xff00) >> 8)
+        elif(keyword == "store"):
+            out.append(0x1e)
+            i+=1
+            out.append(int(x[i]) & 0xff)
+        elif(keyword == "load"):
+            out.append(0x1f)
+            i+=1
+            out.append(int(x[i]) & 0xff)
         else:
             out.append(ops[keyword])
             k+=1
