@@ -23,7 +23,11 @@ ops = {
     "and": 0x1a,
     "or": 0x1b,
     "xor": 0x1c,
-    "not": 0x1d
+    "not": 0x1d,
+    "phpc": 0x20,
+    "wrpc": 0x21,
+    "phsp": 0x22,
+    "wrsp": 0x23
 }
 
 branches = {
@@ -66,7 +70,11 @@ numbytes = {
     "bne": 0x2,
     "bge": 0x2,
     "blt": 0x2,
-    "jmp": 0x2
+    "jmp": 0x2,
+    "phpc": 0x1,
+    "wrpc": 0x1,
+    "phsp": 0x1,
+    "wrsp": 0x1
 }
 
 def parse(x):
