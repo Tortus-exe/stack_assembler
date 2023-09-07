@@ -27,7 +27,7 @@ ops = {
     "phpc": 0x20,
     "wrpc": 0x21,
     "phsp": 0x22,
-    "wrsp": 0x23
+    "wrsp": 0x23,
 }
 
 branches = {
@@ -37,7 +37,8 @@ branches = {
     "bge": 0x15,
     "ble": 0x16,
     "bne": 0x17,
-    "jmp": 0x18
+    "jmp": 0x18,
+    "jsr": 0x24
 }
 
 numbytes = {
@@ -64,17 +65,20 @@ numbytes = {
     "or": 0x01,
     "xor": 0x01,
     "not": 0x01,
-    "beq": 0x2,
-    "bgt": 0x2,
-    "ble": 0x2,
-    "bne": 0x2,
-    "bge": 0x2,
-    "blt": 0x2,
-    "jmp": 0x2,
+    "beq": 0x3,
+    "bgt": 0x3,
+    "ble": 0x3,
+    "bne": 0x3,
+    "bge": 0x3,
+    "blt": 0x3,
+    "jmp": 0x3,
+    "load": 0x2,
+    "store": 0x2,
     "phpc": 0x1,
     "wrpc": 0x1,
     "phsp": 0x1,
-    "wrsp": 0x1
+    "wrsp": 0x1, 
+    "jsr": 0x3
 }
 
 def parse(x):
@@ -110,16 +114,16 @@ def parse(x):
             out.append((r & 0xff00) >> 8)
             out.append((r & 0xff0000) >> 16)
             out.append((r & 0xff000000) >> 24)
-        elif(keyword in ["beq", "bgt", "ble", "bne", "bge", "blt", "jmp"]):
+        elif(keyword in branches.keys()):
             k+=3
             out.append(branches[keyword])
             i+=1
             if(k - labels[x[i] + ":"] >= 0):
-                off = 0xffff - (k - labels[x[i] + ":"]) + 1
+                off = 0xffff - (k - labels[x[i] + ":"]) - 1
                 out.append(off & 0xff)
                 out.append((off & 0xff00) >> 8)
             else:
-                off = labels[x[i] + ":"] - k + 1
+                off = labels[x[i] + ":"] - k
                 out.append(off & 0xff)
                 out.append((off & 0xff00) >> 8)
         elif(keyword == "store"):
