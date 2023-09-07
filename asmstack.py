@@ -28,6 +28,8 @@ ops = {
     "wrpc": 0x21,
     "phsp": 0x22,
     "wrsp": 0x23,
+    "jsrs": 0x25,
+    "halt": 0xff
 }
 
 branches = {
@@ -78,14 +80,13 @@ numbytes = {
     "wrpc": 0x1,
     "phsp": 0x1,
     "wrsp": 0x1, 
-    "jsr": 0x3
+    "jsr": 0x3,
+    "jsrs": 0x1,
+    "halt": 0x1
 }
 
-def parse(x):
-    k = 0
+def resolveLabels(x, labels):
     i = 0
-    out = []
-    labels = {}
     for _, word in enumerate(x):
         if(word[-1] == ':'):
             labels[word] = i
@@ -94,6 +95,12 @@ def parse(x):
     for i,v in enumerate(x):
         if(v[-1] == ":"):
             x.pop(i)
+
+def parse(x):
+    k = 0
+    out = []
+    labels = {}
+    resolveLabels(x, labels)
     # print(labels.items())
     i = 0
     byteOffset=0
@@ -102,7 +109,7 @@ def parse(x):
         if(keyword == "push"):
             out.append(0x03)
             i+=1
-            r = parseint(x[i])
+            r = parseint(x[i], labels)
             out.append(r & 0xff)
             out.append((r & 0xff00) >> 8)
             # print("push at " + str(byteOffset))
@@ -110,7 +117,7 @@ def parse(x):
         elif(keyword == "pushw"):
             out.append(0x02)
             i+=1
-            r = parseint(x[i])
+            r = parseint(x[i], labels)
             out.append(r & 0xff)
             out.append((r & 0xff00) >> 8)
             out.append((r & 0xff0000) >> 16)
@@ -134,13 +141,13 @@ def parse(x):
         elif(keyword == "store"):
             i+=1
             out.append(0x1e)
-            out.append(parseint(x[i]) & 0xff)
+            out.append(parseint(x[i], labels) & 0xff)
             # print("store at " + str(byteOffset))
             byteOffset += 2
         elif(keyword == "load"):
             i+=1
             out.append(0x1f)
-            out.append(parseint(x[i]) & 0xff)
+            out.append(parseint(x[i], labels) & 0xff)
             # print("load at " + str(byteOffset))
             byteOffset += 2
         else:
@@ -150,8 +157,13 @@ def parse(x):
         i = i + 1
     return out
 
-def parseint(num):
-    return int(num, 16) if num[0:2]=="0x" else int(num)
+def parseint(num, labels):
+    if(num[0:2]=="0x"):
+        return int(num, 16)
+    elif(num.isnumeric()):
+        return int(num)
+    else:
+        return labels[num + ":"]
 
 if __name__ == '__main__':
     if(len(sys.argv) != 3 and len(sys.argv) != 2):
@@ -164,4 +176,3 @@ if __name__ == '__main__':
     outf = open(sys.argv[2] if len(sys.argv) == 3 else sys.argv[1] + ".out", 'wb')
     outf.write(bytes(p))
     outf.close()
-
