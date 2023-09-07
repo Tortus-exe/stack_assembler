@@ -89,7 +89,7 @@ def parse(x):
         if(keyword == "push"):
             out.append(0x03)
             i+=1
-            r = int(x[i])
+            r = parseint(x[i])
             out.append(r & 0xff)
             out.append((r & 0xff00) >> 8)
             k+=3
@@ -97,7 +97,7 @@ def parse(x):
             out.append(0x02)
             i+=1
             k+=3
-            r = int(x[i])
+            r = parseint(x[i])
             out.append(r & 0xff)
             out.append((r & 0xff00) >> 8)
             out.append((r & 0xff0000) >> 16)
@@ -117,16 +117,19 @@ def parse(x):
         elif(keyword == "store"):
             out.append(0x1e)
             i+=1
-            out.append(int(x[i]) & 0xff)
+            out.append(parseint(x[i]) & 0xff)
         elif(keyword == "load"):
             out.append(0x1f)
             i+=1
-            out.append(int(x[i]) & 0xff)
+            out.append(parseint(x[i]) & 0xff)
         else:
             out.append(ops[keyword])
             k+=1
         i = i + 1
     return out
+
+def parseint(num):
+    return int(num, 16) if num[0:2]=="0x" else int(num)
 
 if __name__ == '__main__':
     if(len(sys.argv) != 3 and len(sys.argv) != 2):
