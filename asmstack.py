@@ -86,7 +86,7 @@ def parse(x):
     i = 0
     out = []
     labels = {}
-    for k, word in enumerate(x):
+    for _, word in enumerate(x):
         if(word[-1] == ':'):
             labels[word] = i
         else:
@@ -94,8 +94,9 @@ def parse(x):
     for i,v in enumerate(x):
         if(v[-1] == ":"):
             x.pop(i)
+    # print(labels.items())
     i = 0
-    k=0
+    byteOffset=0
     while(i < len(x)):
         keyword = x[i]
         if(keyword == "push"):
@@ -104,39 +105,48 @@ def parse(x):
             r = parseint(x[i])
             out.append(r & 0xff)
             out.append((r & 0xff00) >> 8)
-            k+=3
+            # print("push at " + str(byteOffset))
+            byteOffset+=3
         elif(keyword == "pushw"):
             out.append(0x02)
             i+=1
-            k+=3
             r = parseint(x[i])
             out.append(r & 0xff)
             out.append((r & 0xff00) >> 8)
             out.append((r & 0xff0000) >> 16)
             out.append((r & 0xff000000) >> 24)
+            # print("pushw at " + str(byteOffset))
+            byteOffset+=3
         elif(keyword in branches.keys()):
-            k+=3
             out.append(branches[keyword])
             i+=1
-            if(k - labels[x[i] + ":"] >= 0):
-                off = 0xffff - (k - labels[x[i] + ":"]) - 1
+            byteOffset+=3
+            if(byteOffset - labels[x[i] + ":"] >= 0):
+                # print("branch backward at " + str(byteOffset))
+                off = 0xffff - (byteOffset - labels[x[i] + ":"]) + 1
                 out.append(off & 0xff)
                 out.append((off & 0xff00) >> 8)
             else:
-                off = labels[x[i] + ":"] - k
+                # print("branch forward at " + str(byteOffset))
+                off = labels[x[i] + ":"] - byteOffset
                 out.append(off & 0xff)
                 out.append((off & 0xff00) >> 8)
         elif(keyword == "store"):
+            i+=1
             out.append(0x1e)
-            i+=1
             out.append(parseint(x[i]) & 0xff)
+            # print("store at " + str(byteOffset))
+            byteOffset += 2
         elif(keyword == "load"):
-            out.append(0x1f)
             i+=1
+            out.append(0x1f)
             out.append(parseint(x[i]) & 0xff)
+            # print("load at " + str(byteOffset))
+            byteOffset += 2
         else:
             out.append(ops[keyword])
-            k+=1
+            # print(keyword + " at " + str(byteOffset))
+            byteOffset+=1
         i = i + 1
     return out
 
