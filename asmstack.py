@@ -29,7 +29,9 @@ ops = {
     "phsp": 0x22,
     "wrsp": 0x23,
     "jsrs": 0x25,
-    "pusha": 0x26,
+    "pusha": 0x27,
+    "pushaw": 0x26,
+    "pushab": 0x28,
     "halt": 0xff
 }
 
@@ -84,7 +86,9 @@ numbytes = {
     "jsr": 0x3,
     "jsrs": 0x1,
     "halt": 0x1,
-    "pusha": 0x1
+    "pusha": 0x1,
+    "pushaw": 0x1,
+    "pushab": 0x1
 }
 
 def resolveLabels(x, labels):

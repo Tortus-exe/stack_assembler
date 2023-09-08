@@ -28,16 +28,7 @@ sub_2:
 
 jmp_fnc:
 	store 0xfe
-	dup
 	pusha
-	store 1
-	push 1
-	iadd
-	pusha
-	push 0x100
-	imul
-	load 1
-	or
 	jsrs
 	load 0xfe
 	wrpc
