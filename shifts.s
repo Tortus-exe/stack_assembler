@@ -1,0 +1,7 @@
+	push 0x4
+	push 0x2
+	lsr
+	iprint
+	push 0x4
+	lsl
+	iprint

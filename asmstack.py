@@ -33,6 +33,8 @@ ops = {
     "pushaw": 0x26,
     "pushab": 0x28,
     "sprint": 0x29,
+    "lsl": 0x2a,
+    "lsr": 0x2b,
     "halt": 0xff
 }
 
@@ -90,7 +92,9 @@ numbytes = {
     "pusha": 0x1,
     "pushaw": 0x1,
     "pushab": 0x1,
-    "sprint": 0x1
+    "sprint": 0x1,
+    "lsl": 0x1,
+    "lsr": 0x1
 }
 
 def resolveLabels(x, labels):
