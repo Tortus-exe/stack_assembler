@@ -1,0 +1,6 @@
+	push string
+	sprint
+	halt
+string:
+	"hello world!"
+.db 0

@@ -32,6 +32,7 @@ ops = {
     "pusha": 0x27,
     "pushaw": 0x26,
     "pushab": 0x28,
+    "sprint": 0x29,
     "halt": 0xff
 }
 
@@ -88,7 +89,8 @@ numbytes = {
     "halt": 0x1,
     "pusha": 0x1,
     "pushaw": 0x1,
-    "pushab": 0x1
+    "pushab": 0x1,
+    "sprint": 0x1
 }
 
 def resolveLabels(x, labels):
@@ -98,7 +100,7 @@ def resolveLabels(x, labels):
             labels[word] = i
         elif(word == ".db"):
             r = 1
-            while(x[n+r] not in numbytes.keys() and x[n+r][-1] != ':'):
+            while(n+r < len(x) and x[n+r] not in numbytes.keys() and x[n+r][-1] != ':'):
                 stuff = [ch.replace(" ", "") for ch in x[n+r].split(",")]
                 if(stuff==[".db"]):
                     break
@@ -106,6 +108,16 @@ def resolveLabels(x, labels):
                 i += length
                 # print(x[n+r] + ": len " + str(length) + " so i " + str(i))
                 r += 1
+        elif(word[0] == '"'):
+            i += len(word)
+            if(word[-1] == '"'):
+                i -= 1
+                continue
+            r = n
+            while(x[r][-1] != '"'):
+                i += len(x[r]) + 1
+                r += 1
+            i += len(x[r]) - 1
         else:
             i+=numbytes.get(word, 0)
     for i,v in enumerate(x):
@@ -169,13 +181,22 @@ def parse(x):
             byteOffset += 2
         elif(keyword == ".db"):
             i+=1
-            while(x[i] not in numbytes.keys() and x[i] != ".db"):
+            while(i < len(x) and x[i] not in numbytes.keys() and x[i] != ".db"):
                 bts = defineBytes(x[i], labels)
                 # print(x[i] + " : " + str(bts))
                 out.extend(bts)
                 i+=1
                 byteOffset += len(bts)
             i-=1
+        elif(keyword[0] == '"'):
+            stringlist = []
+            while(x[i][-1] != '"'):
+                stringlist.append(x[i])
+                i+=1
+            stringlist.append(x[i])
+            bts = " ".join(stringlist)[1:-1]
+            byteOffset += len(bts)
+            out.extend([ord(x) for x in bts])
         else:
             # print(keyword + " at " + str(byteOffset))
             out.append(ops[keyword])
