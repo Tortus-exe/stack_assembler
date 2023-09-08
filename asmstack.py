@@ -96,22 +96,24 @@ def resolveLabels(x, labels):
             r = 1
             while(x[n+r] not in numbytes.keys() and x[n+r][-1] != ':'):
                 stuff = [ch.replace(" ", "") for ch in x[n+r].split(",")]
+                if(stuff==[".db"]):
+                    break
                 length = len([ch for ch in stuff if ch != ""])
                 i += length
+                # print(x[n+r] + ": len " + str(length) + " so i " + str(i))
                 r += 1
-                print(x[n+r] + ": len " + str(length) + " so i " + str(i))
         else:
             i+=numbytes.get(word, 0)
     for i,v in enumerate(x):
         if(v[-1] == ":"):
             x.pop(i)
+    # print(labels)
 
 def parse(x):
     k = 0
     out = []
     labels = {}
     resolveLabels(x, labels)
-    print(x)
     # print(labels.items())
     i = 0
     byteOffset=0
@@ -140,7 +142,7 @@ def parse(x):
             i+=1
             byteOffset+=3
             if(byteOffset - labels[x[i] + ":"] >= 0):
-                # print("branch backward at " + str(byteOffset))
+                # print("branch backward at " + hex(byteOffset) + " to " + hex(labels[x[i] + ":"]))
                 off = 0xffff - (byteOffset - labels[x[i] + ":"]) + 1
                 out.append(off & 0xff)
                 out.append((off & 0xff00) >> 8)
@@ -163,9 +165,12 @@ def parse(x):
             byteOffset += 2
         elif(keyword == ".db"):
             i+=1
-            while(x[i] not in numbytes.keys()):
-                out.extend(defineBytes(x[i], labels))
+            while(x[i] not in numbytes.keys() and x[i] != ".db"):
+                bts = defineBytes(x[i], labels)
+                # print(x[i] + " : " + str(bts))
+                out.extend(bts)
                 i+=1
+                byteOffset += len(bts)
             i-=1
         else:
             # print(keyword + " at " + str(byteOffset))
@@ -184,13 +189,13 @@ def parseint(num, labels):
     elif(num.isnumeric()):
         return int(num)
     elif(num[0:2] == ">>"):
-        return labels[num + ":"] & 0xff
+        return labels[num[2:] + ":"] & 0xff
     elif(num[0:2] == "<<"):
-        return (labels[num + ":"] & 0xff000000) >> 24
+        return (labels[num[2:] + ":"] & 0xff000000) >> 24
     elif(num[0] == "<"):
-        return (labels[num + ":"] & 0xff0000) >> 16
+        return (labels[num[1:] + ":"] & 0xff0000) >> 16
     elif(num[0] == ">"):
-        return (labels[num + ":"] & 0xff0000) >> 8
+        return (labels[num[1:] + ":"] & 0xff0000) >> 8
     else:
         return labels[num + ":"]
 
