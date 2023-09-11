@@ -1,9 +1,9 @@
 	jmp main
 
 data:
-.db	>>add_3,>add_3,
-.db	>>mul_8,>mul_8,
-.db	>>sub_2,>sub_2,
+.db	>>add_3,>add_3 
+.db	>>mul_8,>mul_8 
+.db	>>sub_2,>sub_2 
 
 add_3:
 	load 5

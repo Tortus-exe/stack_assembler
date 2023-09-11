@@ -5,6 +5,7 @@
 import Text.Megaparsec
 import Text.Megaparsec.Char hiding (space)
 import Text.Megaparsec.Char.Lexer
+import Text.Megaparsec.Debug
 import Data.Void
 import Data.Char (ord)
 import Data.Text (pack, unpack, Text)
@@ -14,6 +15,7 @@ import Data.HashMap.Strict hiding (map, empty)
 import Data.Bits
 import qualified Data.ByteString as B (pack, writeFile)
 import System.Environment
+import System.IO.Unsafe
 
 type Parser = Parsec Void Text
 
@@ -45,14 +47,39 @@ lexw = lexeme sc
 
 arglessInstrs :: [(Text, Int)]
 arglessInstrs = [
-            ("iprint", 0x4),
-            ("ftoi", 0x6), 
-            ("itof", 0x7), 
-            ("iadd", 0x8),
-            ("isub", 0x9),
-            ("imul", 0xa),
-            ("pop", 0x10),
-            ("wrpc", 0x21)
+    ("nop", 0x00), 
+    ("vtaskdelay", 0x01), 
+    ("iprint", 0x04), 
+    ("fprint", 0x05), 
+    ("ftoi", 0x06), 
+    ("itof", 0x07), 
+    ("iadd", 0x08), 
+    ("isub", 0x09), 
+    ("imul", 0x0a), 
+    ("idiv", 0x0b), 
+    ("fadd", 0x0c), 
+    ("fsub", 0x0d), 
+    ("fmul", 0x0e), 
+    ("fdiv", 0x0f), 
+    ("pop", 0x10), 
+    ("swap", 0x11), 
+    ("dup", 0x19), 
+    ("and", 0x1a), 
+    ("or", 0x1b), 
+    ("xor", 0x1c), 
+    ("not", 0x1d), 
+    ("phpc", 0x20), 
+    ("wrpc", 0x21), 
+    ("phsp", 0x22), 
+    ("wrsp", 0x23), 
+    ("jsrs", 0x25), 
+    ("pusha", 0x27), 
+    ("pushaw", 0x26), 
+    ("pushab", 0x28), 
+    ("sprint", 0x29), 
+    ("lsl", 0x2a), 
+    ("lsr", 0x2b), 
+    ("halt", 0xff)
                 ]
 
 branches :: [(Text, Int)]
@@ -74,10 +101,17 @@ int = SInt <$>
     )
 
 labelRef :: Parser Constant
-labelRef = SLabel <$> (some (choice [alphaNumChar, char '_', char '-', char '>', char '<']) >>= (return . pack))
+labelRef = SLabel <$> (some (choice [alphaNumChar, char '_', char '-', char '>', char '<']) <* lookAhead sc >>= (return . pack))
 
 literalString :: Parser [Constant]
 literalString = (map (SInt . ord) . unpack) <$> (between (char '"') (char '"') $ takeWhile1P Nothing (/= '"'))
+
+sepByLazy :: Parser a -> Parser sep -> Parser [a]
+sepByLazy p sep = do
+  r <- optional p
+  case r of
+    Nothing -> return []
+    Just  x -> (x:) <$> many (try $ sep >> p)
 
 --- INSTRUCTIONS ---
 
@@ -104,13 +138,13 @@ store = Store <$> do
     int
 
 db :: Parser Instruction
-db = Db <$> (string' ".db" *> space1 *> ((lexw int <|> lexw labelRef) `sepBy` (lexw $ char ',')))
+db = Db <$> (string' ".db" *> space1 *> ((int <|> labelRef) `sepBy` ((char ','))))
 
 instruction :: Parser Instruction
-instruction = Instr <$> (choice $ (\x->(string' . fst $ x) >>= \_->return $ snd x) <$> arglessInstrs)
+instruction = Instr <$> (choice $ (\x->(string' . fst $ x) >>= \_->return $ snd x) <$> arglessInstrs) <?> "instruction"
 
 labelDef :: Parser Instruction
-labelDef = LabelDef <$> (some alphaNumChar <* char ':' >>= (return . pack))
+labelDef = LabelDef <$> ((some (choice [alphaNumChar, char '_', char '-', char '>', char '<']) <* char ':' >>= (return . pack)) <?> "label")
 
 stringDef :: Parser Instruction
 stringDef = StringDef <$> literalString
@@ -118,10 +152,9 @@ stringDef = StringDef <$> literalString
 --- MAIN PARSER ---
 
 statement :: Parser [Instruction]
-statement = choice [try labelDef, db, stringDef, branch, load, store, push, instruction] `sepBy1` sc'
+statement = choice [try labelDef, try db, try stringDef, try branch, try load, try store, try push, instruction] `sepBy1` sc'
 --- }}}
-
---- BINARY GENERATION ---
+--- BINARY GENERATION --- {{{
 
 sizeOfInstr :: Instruction -> Int
 sizeOfInstr r = case r of
@@ -149,14 +182,14 @@ unpackLabel labels text = case labels !? text of
 
 dbToBytes :: HashMap Text Int -> [Constant] -> [Int]
 dbToBytes l (SInt x:xs) = (x .&. 0xff):dbToBytes l xs
-dbToBytes l (SLabel x:xs) = if T.take 2 x == ">>" then
-                              ((.&. 0xff) $ unpackLabel l $ T.drop 2 x):dbToBytes l xs
+dbToBytes l (SLabel x:xs) = if T.take 2 x == ">>" then 
+                                    ((.&. 0xff) $ unpackLabel l $ T.drop 2 x):dbToBytes l xs
                           else if T.take 2 x == "<<" then
                                 (shiftR (unpackLabel l $ T.drop 2 x) 24 .&. 0xff):dbToBytes l xs
                                else if T.head x == '>' then
-                                 (shiftR (unpackLabel l $ T.drop 2 x) 8 .&. 0xff):dbToBytes l xs
+                                 (shiftR (unpackLabel l $ T.drop 1 x) 8 .&. 0xff):dbToBytes l xs
                                     else if T.head x == '<' then
-                                        (shiftR (unpackLabel l $ T.drop 2 x) 16 .&. 0xff):dbToBytes l xs
+                                        (shiftR (unpackLabel l $ T.drop 1 x) 16 .&. 0xff):dbToBytes l xs
                                             else error $ "label "++ unpack x ++ " is not 1 byte!"
 dbToBytes _ [] = []
 
@@ -189,7 +222,7 @@ genBinary' _ [] _ = []
 
 genBinary :: [Instruction] -> [Int]
 genBinary = uncurry (genBinary' 0) . resolveLabels 0
-
+---}}}
 --- MAINLOOP ---
 
 main :: IO ()
@@ -199,6 +232,9 @@ main = do
     if k == 1 || k == 2 then do
         let outFile = if k == 2 then a !! 1 else (head a) ++ ".out"
         prg <- TIO.readFile $ head a
-        either (putStr . errorBundlePretty) (B.writeFile outFile . B.pack . map fromIntegral . genBinary) $ parse (sc *> statement <* eof) (head a) prg
+        either (putStr . errorBundlePretty) 
+            -- (print) $ 
+            (B.writeFile outFile . B.pack . map fromIntegral . genBinary) $ 
+                parse (sc *> statement <* eof) (head a) prg
     else
         error "wrong number of args!"
