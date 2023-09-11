@@ -116,7 +116,7 @@ sepByLazy p sep = do
 --- INSTRUCTIONS ---
 
 branch :: Parser Instruction
-branch = choice $ 
+branch = label "branch instruction" $ choice $ 
     (\x->do 
         _ <- (string' . fst $ x) <* space1
         Branch (snd x) <$> labelRef
@@ -152,7 +152,9 @@ stringDef = StringDef <$> literalString
 --- MAIN PARSER ---
 
 statement :: Parser [Instruction]
-statement = choice [try labelDef, try db, try stringDef, try branch, try load, try store, try push, instruction] `sepBy1` sc'
+statement = choice [
+            try labelDef, try db, try stringDef, try branch, try load, try store, try push, instruction
+                   ] `sepEndBy1` sc'
 --- }}}
 --- BINARY GENERATION --- {{{
 

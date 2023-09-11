@@ -12,4 +12,3 @@ start:
 	load 1
 	iadd
 	iprint
-
