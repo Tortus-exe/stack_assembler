@@ -79,6 +79,9 @@ arglessInstrs = [
     ("sprint", 0x29), 
     ("lsl", 0x2a), 
     ("lsr", 0x2b), 
+    ("mod", 0x2c),
+    ("negf", 0x2f),
+    ("neg", 0x2e),
     ("halt", 0xff)
                 ]
 
@@ -196,18 +199,27 @@ dbToBytes l (SLabel x:xs) = if T.take 2 x == ">>" then
 dbToBytes _ [] = []
 
 intToBytes :: Int -> [Int]
-intToBytes k = case (k < 0, abs k < 0xffff) of
-                 (True, True) -> let n = 0x10000 + k in [n .&. 0xff, (shiftR n 8) .&. 0xff]
-                 (True, False) -> let n = 0x100000000 + k in [n .&. 0xff, (shiftR n 8) .&. 0xff, (shiftR n 16) .&. 0xff, (shiftR n 24) .&. 0xff]
-                 (False, True) -> [k .&. 0xff, (shiftR k 8) .&. 0xff]
-                 (False, False) -> [k .&. 0xff, (shiftR k 8) .&. 0xff, (shiftR k 16) .&. 0xff, (shiftR k 24) .&. 0xff]
+intToBytes k = case (k < 0, abs k < 0xffff, abs k < 0xff) of
+                 (True, True, False) -> let n = 0x10000 + k in [n .&. 0xff, (shiftR n 8) .&. 0xff]
+                 (True, False, False) -> let n = 0x100000000 + k in [n .&. 0xff, (shiftR n 8) .&. 0xff, (shiftR n 16) .&. 0xff, (shiftR n 24) .&. 0xff]
+                 (False, True, False) -> [k .&. 0xff, (shiftR k 8) .&. 0xff]
+                 (False, False, False) -> [k .&. 0xff, (shiftR k 8) .&. 0xff, (shiftR k 16) .&. 0xff, (shiftR k 24) .&. 0xff]
+                 (True, True, True) -> let n = 0x100 + k in [n .&. 0xff]
+                 (False, True, True) -> [k .&. 0xff]
+                 _ -> error "somehow a number is greater than 0xffff, yet less than 0xff"
 
 genBinary' :: Int -> [Instruction] -> HashMap Text Int -> [Int]
 genBinary' pos (inst:instrs) labels = bytes ++ rest
     where
         rest = genBinary' (pos + sizeOfInstr inst) instrs labels
         bytes = case inst of
-            Push (SInt num) -> 0x3 : intToBytes num
+            Push (SInt num) -> if num >= 0 && num <= 7 then [0x30+num]
+                               else
+                                   let k = intToBytes num
+                                   in case length k of
+                                        4 -> 2 : k
+                                        2 -> 3 : k
+                                        1 -> 0x2d : k
                                 --num .&. 0xff, (shiftR num 8) .&. 0xff] ++ 
                                 --(if num > 0xffff then [(shiftR num 16) .&. 0xff, (shiftR num 24) .&. 0xff] else [])
             Push (SLabel text) -> let labelValue = unpackLabel labels text 
