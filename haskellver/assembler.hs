@@ -82,6 +82,12 @@ arglessInstrs = [
     ("mod", 0x2c),
     ("negf", 0x2f),
     ("neg", 0x2e),
+    ("malloca", 0x38),
+    ("freea", 0x39),
+    ("indexa", 0x3b),
+    ("indexab", 0x3a),
+    ("indexaw", 0x3c),
+    ("writea", 0x3d),
     ("halt", 0xff)
                 ]
 
@@ -163,12 +169,14 @@ statement = choice [
 
 sizeOfInstr :: Instruction -> Int
 sizeOfInstr r = case r of
-                  Push (SInt num) -> if num > 0xffff then 5 else 3
+                  Push (SInt num) -> if num > 0xffff then 5 else 
+                                        if num > 0xff then 3 else 
+                                            if num > 0x7 then 2 else 1
                   Push (SLabel text) -> 3
                   Instr _  -> 1
                   Branch _ _ -> 3
-                  Load _ -> 2
-                  Store _ -> 2
+                  Load (SInt x) -> if x > 4 then 2 else 1
+                  Store (SInt x) -> if x > 4 then 2 else 1
                   Db x -> length x
                   StringDef x -> length x
                   _ -> undefined
@@ -208,6 +216,13 @@ intToBytes k = case (k < 0, abs k < 0xffff, abs k < 0xff) of
                  (False, True, True) -> [k .&. 0xff]
                  _ -> error "somehow a number is greater than 0xffff, yet less than 0xff"
 
+to16Bit :: [Int] -> [Int]
+to16Bit k = if length k >= 2 then k else
+                if head k .&. 0x80 == 1 then
+                    k ++ [0xff]
+                else
+                    k ++ [0xff]
+
 genBinary' :: Int -> [Instruction] -> HashMap Text Int -> [Int]
 genBinary' pos (inst:instrs) labels = bytes ++ rest
     where
@@ -226,9 +241,9 @@ genBinary' pos (inst:instrs) labels = bytes ++ rest
                                    in 0x3 : (take 2 $ intToBytes labelValue)-- labelValue .&. 0xff, (shiftR labelValue 8) .&. 0xff]
             Instr num -> [num]
             Branch num (SLabel text) -> let labelValue = unpackLabel labels text - pos - 3
-                                         in num : (take 2 $ intToBytes labelValue)-- [num, labelValue .&. 0xff, (shiftR labelValue 8) .&. 0xff]
-            Load (SInt x) -> [0x1f, x .&. 0xff]
-            Store (SInt x) -> [0x1e, x .&. 0xff]
+                                         in num : (take 2 $ to16Bit $ intToBytes labelValue)-- [num, labelValue .&. 0xff, (shiftR labelValue 8) .&. 0xff]
+            Load (SInt x) -> if x <= 4 && x >= 0 then [0x43+x] else [0x1f, x .&. 0xff]
+            Store (SInt x) -> if x <= 4 && x >= 0 then [0x3e+x] else [0x1e, x .&. 0xff]
             Db x -> dbToBytes labels x
             StringDef x -> dbToBytes labels x
             _ -> undefined
