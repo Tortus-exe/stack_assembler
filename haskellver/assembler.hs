@@ -169,9 +169,10 @@ statement = choice [
 
 sizeOfInstr :: Instruction -> Int
 sizeOfInstr r = case r of
-                  Push (SInt num) -> if num > 0xffff then 5 else 
-                                        if num > 0xff then 3 else 
-                                            if num > 0x7 then 2 else 1
+                  Push (SInt num) | num > 0xffff -> 5
+                                  | num > 0xff -> 3
+                                  | num > 0x7 -> 2
+                                  | otherwise -> 1
                   Push (SLabel text) -> 3
                   Instr _  -> 1
                   Branch _ _ -> 3
@@ -195,15 +196,11 @@ unpackLabel labels text = case labels !? text of
 
 dbToBytes :: HashMap Text Int -> [Constant] -> [Int]
 dbToBytes l (SInt x:xs) = (x .&. 0xff):dbToBytes l xs
-dbToBytes l (SLabel x:xs) = if T.take 2 x == ">>" then 
-                                    ((.&. 0xff) $ unpackLabel l $ T.drop 2 x):dbToBytes l xs
-                          else if T.take 2 x == "<<" then
-                                (shiftR (unpackLabel l $ T.drop 2 x) 24 .&. 0xff):dbToBytes l xs
-                               else if T.head x == '>' then
-                                 (shiftR (unpackLabel l $ T.drop 1 x) 8 .&. 0xff):dbToBytes l xs
-                                    else if T.head x == '<' then
-                                        (shiftR (unpackLabel l $ T.drop 1 x) 16 .&. 0xff):dbToBytes l xs
-                                            else error $ "label "++ unpack x ++ " is not 1 byte!"
+dbToBytes l (SLabel x:xs) | T.take 2 x == ">>" = ((.&. 0xff) $ unpackLabel l $ T.drop 2 x):dbToBytes l xs
+                          | T.take 2 x == "<<" = (shiftR (unpackLabel l $ T.drop 2 x) 24 .&. 0xff):dbToBytes l xs
+                          | T.head x == '>' = (shiftR (unpackLabel l $ T.drop 1 x) 8 .&. 0xff):dbToBytes l xs
+                          | T.head x == '<' = (shiftR (unpackLabel l $ T.drop 1 x) 16 .&. 0xff):dbToBytes l xs
+                          | otherwise = error $ "label "++ unpack x ++ " is not 1 byte!"
 dbToBytes _ [] = []
 
 intToBytes :: Int -> [Int]
@@ -218,10 +215,10 @@ intToBytes k = case (k < 0, abs k < 0xffff, abs k < 0xff) of
 
 to16Bit :: [Int] -> [Int]
 to16Bit k = if length k >= 2 then k else
-                if head k .&. 0x80 == 1 then
+                if head k >= 0x80 then
                     k ++ [0xff]
                 else
-                    k ++ [0xff]
+                    k ++ [0x00]
 
 genBinary' :: Int -> [Instruction] -> HashMap Text Int -> [Int]
 genBinary' pos (inst:instrs) labels = bytes ++ rest
@@ -238,7 +235,7 @@ genBinary' pos (inst:instrs) labels = bytes ++ rest
                                 --num .&. 0xff, (shiftR num 8) .&. 0xff] ++ 
                                 --(if num > 0xffff then [(shiftR num 16) .&. 0xff, (shiftR num 24) .&. 0xff] else [])
             Push (SLabel text) -> let labelValue = unpackLabel labels text 
-                                   in 0x3 : (take 2 $ intToBytes labelValue)-- labelValue .&. 0xff, (shiftR labelValue 8) .&. 0xff]
+                                   in 0x3 : (take 2 $ to16Bit $ intToBytes labelValue)-- labelValue .&. 0xff, (shiftR labelValue 8) .&. 0xff]
             Instr num -> [num]
             Branch num (SLabel text) -> let labelValue = unpackLabel labels text - pos - 3
                                          in num : (take 2 $ to16Bit $ intToBytes labelValue)-- [num, labelValue .&. 0xff, (shiftR labelValue 8) .&. 0xff]
@@ -258,12 +255,13 @@ main :: IO ()
 main = do
     a <- getArgs
     let k = length a
-    if k == 1 || k == 2 then do
-        let outFile = if k == 2 then a !! 1 else (head a) ++ ".out"
-        prg <- TIO.readFile $ head a
-        either (putStr . errorBundlePretty) 
-            -- (print) $ 
-            (B.writeFile outFile . B.pack . map fromIntegral . genBinary) $ 
-                parse (sc *> statement <* eof) (head a) prg
-    else
-        error "wrong number of args!"
+    let outFile = case k of
+                    1 -> (head a) ++ ".out"
+                    2 -> a !! 1
+                    _ -> error "wrong number of args!"
+        -- let outFile = if k == 2 then a !! 1 else (head a) ++ ".out"
+    prg <- TIO.readFile $ head a
+    either (putStr . errorBundlePretty) 
+        -- (print) $ 
+        (B.writeFile outFile . B.pack . map fromIntegral . genBinary) $ 
+            parse (sc *> statement <* eof) (head a) prg
